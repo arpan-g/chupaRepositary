@@ -21,7 +21,7 @@ object Bacon
 		val conf = new SparkConf().setAppName("Kevin Bacon app")
 		conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
 		//conf.set("spark.storage.memoryFraction", "0.5") 
-		conf.set("spark.default.parallelism", "500") 
+		conf.set("spark.default.parallelism", "400") 
 		conf.set("spark.executor.memory","2g")
 		conf.set("spark.rdd.compress","true")
 	    conf.set("spark.files.overwrite","true")
@@ -68,28 +68,22 @@ object Bacon
 		val actor2actorsList = actorsList.map{case (list)=>(list.map(_->list))}
 		val actor2Coactor = actor2actorsList.flatMap(x=>x).map{case (a,b)=>(a,b.filter(x=>(x!=a)))}//.filter(x=>(x._2.nonEmpty))
 		  //super expensive, cache is a problem ExecutorLostFailure
-		val actor2CoActorAll = actor2Coactor.reduceByKey((a,b)=>(b:::a))//.cache()//.persist(org.apache.spark.storage.StorageLevel.MEMORY_ONLY_SER)	
-		var  joinRDDS = actors2DistanceMap.join(actor2CoActorAll)
-		var distance  = joinRDDS.map{case (actor,(dis,list))=>(list.map(_ -> dis))}.flatMap(x=>x).map(xs => (xs._1 -> (xs._2 + 1))).reduceByKey((a,b)=>Math.min(a,b)).persist(org.apache.spark.storage.StorageLevel.MEMORY_ONLY_SER)
-		//var initialDistance = actors2DistanceMap
-		
-	
-		for(i<- 1 until 6){
-		 val tempdistance = actors2DistanceMap.join(distance)
-//		 distance.unpersist(false)
+		val actor2CoActorAll = actor2Coactor.reduceByKey((a,b)=>(b:::a)).persist(org.apache.spark.storage.StorageLevel.MEMORY_ONLY_SER)	
 
-		 distance = tempdistance.map({case (actor,(initDistance,newDistance))=>
-			(actor,Math.min(initDistance,newDistance))})//.persist(org.apache.spark.storage.StorageLevel.MEMORY_ONLY_SER)	
+		 var  joinRDDS = actors2DistanceMap.join(actor2CoActorAll)
+		  var distance  = joinRDDS.map{case (actor,(dis,list))=>(list.map(_ -> dis))}.flatMap(x=>x).map(xs => (xs._1 -> (xs._2 + 1))).reduceByKey((a,b)=>Math.min(a,b)).persist(org.apache.spark.storage.StorageLevel.MEMORY_ONLY_SER)
+		for(i<- 1 until 6){
 		 joinRDDS = distance.join(actor2CoActorAll)
-		distance = joinRDDS.map{case (actor,(dis,list))=>(list.map(_ -> dis))}
-		 .flatMap(x=>x).map(xs => (xs._1 -> (xs._2 + 1))).reduceByKey((a,b)=>Math.min(a,b))//.persist(org.apache.spark.storage.StorageLevel.MEMORY_ONLY_SER)
-		
+		 distance = joinRDDS.map{case (actor,(dis,list))=>(list.map(_ -> dis))}
+		 .flatMap(x=>x).map(xs => (xs._1 -> (xs._2 + 1))).reduceByKey((a,b)=>Math.min(a,b))
+		 val tempdistance = actors2DistanceMap.join(distance)
+		 distance.unpersist(true)
+		 distance = tempdistance.map({case (actor,(initDistance,newDistance))=>
+			(actor,Math.min(initDistance,newDistance))}).persist(org.apache.spark.storage.StorageLevel.MEMORY_ONLY_SER)
 		 }
-	
-		 val kevin2_0  = distance.map{case (id,distance)=>(id,if(id == idKevin) 0 else distance)} 
 		 val idActorMap = actors2IdMap.map{case (actor,id)=>(id,actor)}
-		 val distanceActor = kevin2_0.join(idActorMap)
-		 val sortDistance= distanceActor.map{case (id,(distance,actor)) =>(distance,actor)}
+		 val distanceActor = distance.join(idActorMap)
+		 val sortDistance= distanceActor.map{case (id,(distance,actor)) =>(distance,actor)}.sortByKey(false)
 		 val countOfEachKeys = sortDistance.countByKey()
 		 val distance6 = sortDistance.filter(x=>x._1 == 6).map{case (dist,actor)=>(actor,dist)}.sortByKey()
 
