@@ -100,7 +100,7 @@ object Bacon
 		pw.write("actors\t")
 		pw.write(actorsCount.toString) 
 		pw.write("\n")
-	    pw.write("movies\t")
+	    	pw.write("movies\t")
 		pw.write(movieCount.toString)
 		pw.write("\n")
 		pw.write("distance to number of actors mapping \n")
