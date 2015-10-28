@@ -72,11 +72,11 @@ object Bacon
 		val actor2Coactor = actor2actorsList.flatMap(x=>x).map{case (a,b)=>(a,b.filter(x=>(x!=a)))}
 		// create actor to coactor list 
 		val actor2CoActorAll = actor2Coactor.reduceByKey((a,b)=>(b:::a))
-		.persist(org.apache.spark.storage.StorageLevel.MEMORY_ONLY_SER)	
+		//.persist(org.apache.spark.storage.StorageLevel.MEMORY_ONLY_SER)	
 		//assign actors there initiall distance
 		var  joinRDDS = actors2DistanceMap.join(actor2CoActorAll)
 		var distance  = joinRDDS.map{case (actor,(dis,list))=>(list.map(_ -> dis))}.flatMap(x=>x).map(xs => (xs._1 -> (xs._2 + 1)))
-		.reduceByKey((a,b)=>Math.min(a,b)).persist(org.apache.spark.storage.StorageLevel.MEMORY_ONLY_SER)
+		.reduceByKey((a,b)=>Math.min(a,b))//.persist(org.apache.spark.storage.StorageLevel.MEMORY_ONLY_SER)
 		//iterate 5 times aftere initialization for the first time
 		for(i<- 1 until 6){
 			joinRDDS = distance.join(actor2CoActorAll)
